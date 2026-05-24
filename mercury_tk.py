@@ -740,6 +740,9 @@ class MercuryTk:  # 主 ui 绘制
                             self.chatPath.get(),
                             f"{payload["dest_callsign"]}_{self.sessionTime}",
                         )
+                        self.chatText.configure(state="normal")
+                        self.chatText.delete("1.0", tk.END)
+                        self.chatText.configure(state="disabled")
                         if not os.path.exists(self.sessionPath):
                             os.makedirs(self.sessionPath)
                 else:  # 断连, 清理
