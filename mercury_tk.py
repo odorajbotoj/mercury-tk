@@ -14,21 +14,22 @@ import kiss
 import waterfall
 
 
-class MercuryTk:
+class MercuryTk:  # 主 ui 绘制
     def __init__(self):
         self.net = mtk_net.MtkNet()
-        self.audioCaptureDevices = {}
-        self.audioPlaybackDevices = {}
-        self.radioModels = {}
+        self.audioCaptureDevices = {}  # 存放音频输入设备的 name - id 对应
+        self.audioPlaybackDevices = {}  # 存放音频输出设备的 name - id 对应
+        self.radioModels = {}  # 存放 hamlib 设备类型的 name - id 对应
         self.recvStat = 0  # 0 Idle, 1 Len, 2 Str, 3 Name, 4 Size, 5 File
-        self.recvTime = ""
-        self.fileNameTmp = b""
-        self.lenSaved = 0
-        self.contentLenTmp = 0
-        self.dataTmp = b""
-        self.sessionTime = ""
-        self.sessionPath = ""
+        self.recvTime = datetime.datetime.now()  # 接收到数据的时间
+        self.fileNameTmp = b""  # 接收到的文件名 (缓冲区)
+        self.lenSaved = 0  # 接收数据长度的状态
+        self.contentLenTmp = 0  # 接收数据长度 (缓冲区)
+        self.dataTmp = b""  # 接收数据缓冲区
+        self.sessionTime = ""  # 当前 connection 的建立时间
+        self.sessionPath = ""  # 当前 connection 历史保存的路径
 
+        # 主窗口
         self.window = tk.Tk()
         self.window.title("mercury-tk")
         self.window.geometry("1024x768+10+10")
@@ -58,9 +59,11 @@ class MercuryTk:
         self.wfCanvas.grid(row=6, column=0, sticky="ew")
         self.wf = waterfall.Waterfall(self.wfCanvas)
 
-        # dir
+        # 创建历史保存文件夹
         if not os.path.exists(self.chatPath.get()):
             os.makedirs(self.chatPath.get())
+
+    # 以下为窗口各部分绘制流程, 太长了, 分割成几个函数
 
     def win_add_settings(self):
         # settings notebook
@@ -368,12 +371,16 @@ class MercuryTk:
 
         # status end
 
+    # 以下为更新串口的回调
+
     def update_serial_port(self, _):
         l = []
         for i in serial_list_ports.comports():
             l.append(i.device)
         self.dvcCom["value"] = l
         self.dvcCom.current(0)
+
+    # 以下为浏览路径的回调
 
     def browse_chat_path(self):
         self.chatPath.set(
@@ -391,6 +398,8 @@ class MercuryTk:
             )
         )
 
+    # 以下为更新时间的回调
+
     def update_log_date(self, _):
         self.logDate.set(
             datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
@@ -401,12 +410,13 @@ class MercuryTk:
             datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%SZ")
         )
 
+    # 以下为按钮回调
+
     def cb_connect(self):
         if self.net.closed:
             self.net.connect(
                 self.basePort.get(), self.kissPort.get(), self.wsPort.get()
             )
-            # self.net.dataQ.put({})
         else:
             self.net.disconnect()
 
@@ -454,6 +464,7 @@ class MercuryTk:
                 "payload": "\r".join(cmds) + "\r",
             }
         )
+        # 追加到命令历史
         self.cmdLog.configure(state="normal")
         for i in cmds:
             self.cmdLog.insert(
@@ -467,6 +478,7 @@ class MercuryTk:
         if self.net.closed:
             return
         self.net.dataQ.put({"dest": "cmd", "payload": "DISCONNECT\r"})
+        # 追加到命令历史
         self.cmdLog.configure(state="normal")
         self.cmdLog.insert(
             tk.END,
@@ -479,6 +491,7 @@ class MercuryTk:
         if self.net.closed:
             return
         self.net.dataQ.put({"dest": "cmd", "payload": "ABORT\r"})
+        # 追加到命令历史
         self.cmdLog.configure(state="normal")
         self.cmdLog.insert(
             tk.END,
@@ -494,6 +507,7 @@ class MercuryTk:
             messagebox.showerror("Error", "No callsign")
             return
         cmd = f"CQFRAME {self.myCallsign.get()} {self.bwCom.get()}"
+        # 追加到命令历史
         self.net.dataQ.put({"dest": "cmd", "payload": cmd + "\r"})
         self.cmdLog.configure(state="normal")
         self.cmdLog.insert(
@@ -502,6 +516,7 @@ class MercuryTk:
         )
         self.cmdLog.configure(state="disabled")
         self.cmdLog.see(tk.END)
+        # 追加到CQ历史
         self.cqText.configure(state="normal")
         self.cqText.insert(
             tk.END,
@@ -521,6 +536,7 @@ class MercuryTk:
             return
         cmd = f"CONNECT {self.myCallsign.get()} {self.connectDest.get()}"
         self.net.dataQ.put({"dest": "cmd", "payload": cmd + "\r"})
+        # 追加到命令历史
         self.cmdLog.configure(state="normal")
         self.cmdLog.insert(
             tk.END,
@@ -531,6 +547,7 @@ class MercuryTk:
         self.connectDest.set("")
 
     def cb_send(self):
+        # 检查
         if self.net.closed:
             return
         l = len(self.chatTextInput.get().encode())
@@ -539,6 +556,7 @@ class MercuryTk:
         if l > 65535:
             messagebox.showerror("Error", "Too long", detail=f"{l} > max 65535")
             return
+        # 入队
         self.net.dataQ.put(
             {
                 "dest": "data",
@@ -546,12 +564,14 @@ class MercuryTk:
                 + f"{self.chatTextInput.get()}\n".encode(),
             }
         )
+        # 追加
         dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.chatText.configure(state="normal")
         self.chatText.insert(
             tk.END,
             f"{dt} send: {self.chatTextInput.get()}\n",
         )
+        # 保存
         with open(
             os.path.join(self.sessionPath, "chat.csv"),
             "a",
@@ -602,6 +622,7 @@ class MercuryTk:
         self.chatText.see(tk.END)
 
     def cb_broadcast(self):
+        # 仅允许ASCII, 长度不超过126
         if self.net.closed:
             return
         s = self.broadcastInput.get()
@@ -636,14 +657,16 @@ class MercuryTk:
             w.writerow([dt, "send", self.broadcastInput.get()])
         self.broadcastInput.set("")
 
+    # 主App运行
     def run(self):
         self.handle_data()
         self.window.mainloop()
 
+    # 处理数据
     def handle_data(self):
         while not self.net.uiQ.empty():
             data = self.net.uiQ.get()
-            if data["type"] == "modem":
+            if data["type"] == "modem":  # 更新连接状态
                 if data["connected"]:
                     self.connBtnText.set("Disconnect")
                     self.connStat.configure(text="MODEM CONNECTED", foreground="green")
@@ -651,13 +674,13 @@ class MercuryTk:
                     self.connBtnText.set("Connect")
                     self.connStat.configure(text="MODEM DISCONNECTED", foreground="red")
                     messagebox.showerror(title="Error", message="Modem disconnected")
-            elif data["type"] == "ws":
+            elif data["type"] == "ws":  # 交给ws处理器
                 self.handle_ws_data(data["payload"])
-            elif data["type"] == "waterfall":
+            elif data["type"] == "waterfall":  # 交给瀑布图处理器
                 re = waterfall.parse_spectrum(data["payload"])
                 if re:
                     self.wf.push(*re)
-            elif data["type"] == "cmd":
+            elif data["type"] == "cmd":  # 追加到命令历史框, 两个特殊命令做额外处理
                 self.cmdLog.configure(state="normal")
                 self.cmdLog.insert(
                     tk.END,
@@ -675,138 +698,9 @@ class MercuryTk:
                     self.cqText.see(tk.END)
                 elif data["payload"].startswith("BUFFER"):
                     self.recvTmp.set(f"Data remaining: {data["payload"][7:]}")
-            elif data["type"] == "data":
-                for b in data["payload"]:
-                    if self.recvStat == 0:
-                        self.recvTime = datetime.datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        if b == ord("\n"):
-                            self.recvStat = 1
-                        elif b == ord("\r"):
-                            self.recvStat = 3
-                    elif self.recvStat == 1:
-                        if self.lenSaved == 0:
-                            self.contentLenTmp = b * 256
-                            self.lenSaved = 1
-                        elif self.lenSaved == 1:
-                            self.contentLenTmp += b
-                            self.lenSaved = 2
-                        elif self.lenSaved == 2:
-                            self.lenSaved = 0
-                            if b == ord("\r"):
-                                self.recvStat = 2
-                            else:
-                                messagebox.showerror("Error", "Bad data length")
-                                self.recvStat = 0
-                                break
-                    elif self.recvStat == 2:
-                        if b == ord("\n"):
-                            if len(self.dataTmp) == self.contentLenTmp:
-                                self.chatText.configure(state="normal")
-                                self.chatText.insert(
-                                    tk.END,
-                                    f"{self.recvTime} recv: {self.dataTmp.decode(errors="backslashreplace")}\n",
-                                )
-                                with open(
-                                    os.path.join(self.sessionPath, "chat.csv"),
-                                    "a",
-                                    encoding="utf-8",
-                                ) as f:
-                                    w = csv.writer(f)
-                                    w.writerow(
-                                        [
-                                            self.recvTime,
-                                            "recv",
-                                            "chat",
-                                            self.dataTmp.decode(
-                                                errors="backslashreplace"
-                                            ),
-                                        ]
-                                    )
-                                self.chatText.configure(state="disabled")
-                                self.chatText.see(tk.END)
-                                self.dataTmp = b""
-                                self.recvTmp.set("")
-                            else:
-                                messagebox.showerror(
-                                    "Error",
-                                    "Length not equal",
-                                    detail=f"{len(self.dataTmp)} != {self.contentLenTmp}",
-                                )
-                            self.contentLenTmp = 0
-                            self.recvStat = 0
-                            continue
-                        self.dataTmp += bytes([b])
-                        self.recvTmp.set(
-                            f"Recv: {self.dataTmp.decode(errors="backslashreplace")}"
-                        )
-                    elif self.recvStat == 3:
-                        if b != ord("\r"):
-                            self.fileNameTmp += bytes([b])
-                        else:
-                            self.recvStat = 4
-                    elif self.recvStat == 4:
-                        if self.lenSaved == 0:
-                            self.contentLenTmp = b * 256
-                            self.lenSaved = 1
-                        elif self.lenSaved == 1:
-                            self.contentLenTmp += b
-                            self.lenSaved = 2
-                        elif self.lenSaved == 2:
-                            self.lenSaved = 0
-                            if b == ord("\r"):
-                                self.recvStat = 5
-                            else:
-                                messagebox.showerror("Error", "Bad data length")
-                                self.recvStat = 0
-                                break
-                    elif self.recvStat == 5:
-                        if b == ord("\r") and len(self.dataTmp) == self.contentLenTmp:
-                            self.chatText.configure(state="normal")
-                            self.chatText.insert(
-                                tk.END,
-                                f"{self.recvTime} recv file: {self.fileNameTmp.decode(errors="backslashreplace")}\n",
-                            )
-                            with open(
-                                os.path.join(self.sessionPath, "chat.csv"),
-                                "a",
-                                encoding="utf-8",
-                            ) as f:
-                                w = csv.writer(f)
-                                w.writerow(
-                                    [
-                                        self.recvTime,
-                                        "recv",
-                                        "file",
-                                        self.fileNameTmp.decode(
-                                            errors="backslashreplace"
-                                        ),
-                                    ]
-                                )
-                            self.chatText.configure(state="disabled")
-                            self.chatText.see(tk.END)
-                            with open(
-                                os.path.join(
-                                    self.sessionPath,
-                                    self.fileNameTmp.decode(errors="backslashreplace"),
-                                ),
-                                "wb",
-                            ) as savefile:
-                                savefile.write(self.dataTmp)
-                            self.dataTmp = b""
-                            self.recvTmp.set(
-                                f"File saved: {self.fileNameTmp.decode(errors="backslashreplace")}."
-                            )
-                            self.fileNameTmp = b""
-                            self.contentLenTmp = 0
-                            self.recvStat = 0
-                            continue
-                        self.dataTmp += bytes([b])
-                        self.recvTmp.set(
-                            f"Recv file: {self.fileNameTmp.decode(errors="backslashreplace")} ({len(self.dataTmp)} / {self.contentLenTmp})"
-                        )
-            elif data["type"] == "kiss":
+            elif data["type"] == "data":  # 交给数据处理器
+                self.parse_data_payload(data["payload"])
+            elif data["type"] == "kiss":  # 处理广播包
                 l = kiss.kiss_decode(data["payload"])
                 dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 self.broadcast.configure(state="normal")
@@ -824,18 +718,19 @@ class MercuryTk:
                     for pld in l:
                         w = csv.writer(f)
                         w.writerow([dt, "recv", pld.decode(errors="backslashreplace")])
-        self.window.after(50, self.handle_data)
+        self.window.after(50, self.handle_data)  # 自调用
 
+    # ws处理器
     def handle_ws_data(self, payload):
         if "type" in payload.keys():
-            if payload["type"] == "status":
+            if payload["type"] == "status":  # 更新modem状态
                 self.bitrate.configure(text=f"BR {payload["bitrate"]}")
                 self.snr.configure(text=f"SNR {payload["snr"]}")
                 self.userCall.configure(text=f"UserCall {payload["user_callsign"]}")
                 if self.myCallsign.get() == "":
                     self.myCallsign.set(payload["user_callsign"])
                 self.destCall.configure(text=f"DestCall {payload["dest_callsign"]}")
-                if payload["sync"]:
+                if payload["sync"]:  # 连接, 更新session数据
                     self.sync.config(text="SYNC", foreground="green")
                     if self.sessionTime == "":
                         self.sessionTime = datetime.datetime.now().strftime(
@@ -847,10 +742,10 @@ class MercuryTk:
                         )
                         if not os.path.exists(self.sessionPath):
                             os.makedirs(self.sessionPath)
-                else:  # disconnect
+                else:  # 断连, 清理
                     self.sync.config(text="NO SYNC", foreground="red")
                     self.recvStat = 0
-                    self.recvTime = ""
+                    self.recvTime = datetime.datetime.now()
                     self.fileNameTmp = b""
                     self.lenSaved = 0
                     self.contentLenTmp = 0
@@ -864,7 +759,7 @@ class MercuryTk:
                     self.direction.configure(text=f"DIR: TX", foreground="red")
                 self.bytesTx.configure(text=f"TX {payload["bytes_transmitted"]}")
                 self.bytesRx.configure(text=f"RX {payload["bytes_received"]}")
-            elif payload["type"] == "capture_dev_list":
+            elif payload["type"] == "capture_dev_list":  # 更新音频输入设备列表
                 l = []
                 self.audioCaptureDevices = {}
                 cur = 0
@@ -879,7 +774,7 @@ class MercuryTk:
                     ] = payload["list"][i]["id"]
                 self.cptCom["values"] = l
                 self.cptCom.current(cur)
-            elif payload["type"] == "playback_dev_list":
+            elif payload["type"] == "playback_dev_list":  # 更新音频输出设备列表
                 l = []
                 self.audioPlaybackDevices = {}
                 cur = 0
@@ -894,10 +789,10 @@ class MercuryTk:
                     ] = payload["list"][i]["id"]
                 self.plbkCom["values"] = l
                 self.plbkCom.current(cur)
-            elif payload["type"] == "input_channel":
+            elif payload["type"] == "input_channel":  # 更新声道选项
                 self.chnCom["values"] = payload["list"]
                 self.chnCom.current(payload["list"].index(payload["selected"]))
-            elif payload["type"] == "radio_list":
+            elif payload["type"] == "radio_list":  # 更新电台设备列表
                 l = []
                 self.radioModels = {}
                 cur = 0
@@ -916,6 +811,7 @@ class MercuryTk:
                 self.bdrtCom.current(
                     self.bdrtCom["values"].index(str(payload["serial_speed"]))
                 )
+        # 处理命令返回
         if "status" in payload.keys():
             if payload["status"] == "ok":
                 messagebox.showinfo("OK", "websocket returned OK")
@@ -927,3 +823,136 @@ class MercuryTk:
             messagebox.showerror(
                 "Error", "Error from websocket", detail=payload["error"]
             )
+
+    # 解析接收数据
+    def parse_data_payload(self, pld):
+        for b in pld:
+            if self.recvStat == 0:
+                self.recvTime = datetime.datetime.now()
+                if b == ord("\n"):  # 文本
+                    self.recvStat = 1
+                elif b == ord("\r"):  # 文件
+                    self.recvStat = 3
+            elif self.recvStat == 1:  # 接收两位内容长度
+                if self.lenSaved == 0:
+                    self.contentLenTmp = b * 256
+                    self.lenSaved = 1
+                elif self.lenSaved == 1:
+                    self.contentLenTmp += b
+                    self.lenSaved = 2
+                elif self.lenSaved == 2:
+                    self.lenSaved = 0
+                    if b == ord("\r"):
+                        self.recvStat = 2
+                    else:
+                        messagebox.showerror("Error", "Bad data length")
+                        self.recvStat = 0
+                        break
+            elif self.recvStat == 2:
+                if b == ord("\n"):  # 文本接收完毕
+                    if len(self.dataTmp) == self.contentLenTmp:
+                        # 显示
+                        self.chatText.configure(state="normal")
+                        self.chatText.insert(
+                            tk.END,
+                            f"{self.recvTime.strftime("%Y-%m-%d %H:%M:%S")} recv: {self.dataTmp.decode(errors="backslashreplace")}\n",
+                        )
+                        self.chatText.configure(state="disabled")
+                        self.chatText.see(tk.END)
+                        # 落盘
+                        with open(
+                            os.path.join(self.sessionPath, "chat.csv"),
+                            "a",
+                            encoding="utf-8",
+                        ) as f:
+                            w = csv.writer(f)
+                            w.writerow(
+                                [
+                                    self.recvTime.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "recv",
+                                    "chat",
+                                    self.dataTmp.decode(errors="backslashreplace"),
+                                ]
+                            )
+                        # 清理
+                        self.dataTmp = b""
+                        self.recvTmp.set("")
+                    else:
+                        messagebox.showerror(
+                            "Error",
+                            "Length not equal",
+                            detail=f"{len(self.dataTmp)} != {self.contentLenTmp}",
+                        )
+                    self.contentLenTmp = 0
+                    self.recvStat = 0
+                    continue
+                self.dataTmp += bytes([b])
+                self.recvTmp.set(
+                    f"Recv: {self.dataTmp.decode(errors="backslashreplace")}"
+                )
+            elif self.recvStat == 3:  # 接收文件名
+                if b != ord("\r"):
+                    self.fileNameTmp += bytes([b])
+                else:
+                    self.recvStat = 4
+            elif self.recvStat == 4:  # 接收两位内容长度
+                if self.lenSaved == 0:
+                    self.contentLenTmp = b * 256
+                    self.lenSaved = 1
+                elif self.lenSaved == 1:
+                    self.contentLenTmp += b
+                    self.lenSaved = 2
+                elif self.lenSaved == 2:
+                    self.lenSaved = 0
+                    if b == ord("\r"):
+                        self.recvStat = 5
+                    else:
+                        messagebox.showerror("Error", "Bad data length")
+                        self.recvStat = 0
+                        break
+            elif self.recvStat == 5:
+                if b == ord("\r") and len(self.dataTmp) == self.contentLenTmp:
+                    # 显示
+                    self.chatText.configure(state="normal")
+                    self.chatText.insert(
+                        tk.END,
+                        f"{self.recvTime.strftime("%Y-%m-%d %H:%M:%S")} recv file: {self.fileNameTmp.decode(errors="backslashreplace")}\n",
+                    )
+                    self.chatText.configure(state="disabled")
+                    self.chatText.see(tk.END)
+                    # 落盘
+                    with open(
+                        os.path.join(self.sessionPath, "chat.csv"),
+                        "a",
+                        encoding="utf-8",
+                    ) as f:
+                        w = csv.writer(f)
+                        w.writerow(
+                            [
+                                self.recvTime.strftime("%Y-%m-%d %H:%M:%S"),
+                                "recv",
+                                "file",
+                                self.fileNameTmp.decode(errors="backslashreplace"),
+                            ]
+                        )
+                    fp = os.path.join(
+                        self.sessionPath,
+                        self.recvTime.strftime("%Y-%m-%d_%H-%M-%S_")
+                        + self.fileNameTmp.decode(errors="backslashreplace"),
+                    )
+                    with open(fp, "wb") as savefile:
+                        savefile.write(self.dataTmp)
+                    self.recvTmp.set(f"File saved: {fp}.")
+                    # 清理
+                    self.dataTmp = b""
+                    self.fileNameTmp = b""
+                    self.contentLenTmp = 0
+                    self.recvStat = 0
+                    continue
+                self.dataTmp += bytes([b])
+                self.recvTmp.set(
+                    f"Recv file: {self.fileNameTmp.decode(errors="backslashreplace")} ({len(self.dataTmp)} / {self.contentLenTmp})"
+                )
+
+
+# 实话实说, 这个python文件太大了, Pylance 和 Black Formatter 都卡了
