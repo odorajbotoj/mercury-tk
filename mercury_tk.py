@@ -5,11 +5,12 @@ from tkinter import messagebox
 
 import serial.tools.list_ports as serial_list_ports
 
-import datetime, os
+import datetime, os, csv
 
 # user-define
 import adif
 import mtk_net
+import kiss
 import waterfall
 
 
@@ -315,7 +316,7 @@ class MercuryTk:
         ttk.Entry(broadcastPage, textvariable=self.broadcastInput).grid(
             row=1, column=0, sticky="ew"
         )
-        ttk.Button(broadcastPage, text="Send broadcast").grid(
+        ttk.Button(broadcastPage, text="Broadcast", command=self.cb_broadcast).grid(
             row=1, column=1, sticky="nsew"
         )
 
@@ -405,6 +406,7 @@ class MercuryTk:
             self.net.connect(
                 self.basePort.get(), self.kissPort.get(), self.wsPort.get()
             )
+            # self.net.dataQ.put({})
         else:
             self.net.disconnect()
 
@@ -488,6 +490,9 @@ class MercuryTk:
     def cb_cq(self):
         if self.net.closed:
             return
+        if self.myCallsign.get() == "":
+            messagebox.showerror("Error", "No callsign")
+            return
         cmd = f"CQFRAME {self.myCallsign.get()} {self.bwCom.get()}"
         self.net.dataQ.put({"dest": "cmd", "payload": cmd + "\r"})
         self.cmdLog.configure(state="normal")
@@ -508,6 +513,12 @@ class MercuryTk:
     def cb_connect_dest(self):
         if self.net.closed:
             return
+        if self.myCallsign.get() == "":
+            messagebox.showerror("Error", "No callsign")
+            return
+        if self.connectDest.get() == "":
+            messagebox.showerror("Error", "No destination callsign")
+            return
         cmd = f"CONNECT {self.myCallsign.get()} {self.connectDest.get()}"
         self.net.dataQ.put({"dest": "cmd", "payload": cmd + "\r"})
         self.cmdLog.configure(state="normal")
@@ -523,6 +534,8 @@ class MercuryTk:
         if self.net.closed:
             return
         l = len(self.chatTextInput.get().encode())
+        if l == 0:
+            return
         if l > 65535:
             messagebox.showerror("Error", "Too long", detail=f"{l} > max 65535")
             return
@@ -544,7 +557,8 @@ class MercuryTk:
             "a",
             encoding="utf-8",
         ) as f:
-            f.write(f"{dt},send,chat,{self.chatTextInput.get()}\n")
+            w = csv.writer(f)
+            w.writerow([dt, "send", "chat", self.chatTextInput.get()])
         self.chatText.configure(state="disabled")
         self.chatText.see(tk.END)
         self.chatTextInput.set("")
@@ -582,9 +596,45 @@ class MercuryTk:
             "a",
             encoding="utf-8",
         ) as f:
-            f.write(f"{dt},send,file,{name}\n")
+            w = csv.writer(f)
+            w.writerow([dt, "send", "file", name])
         self.chatText.configure(state="disabled")
         self.chatText.see(tk.END)
+
+    def cb_broadcast(self):
+        if self.net.closed:
+            return
+        s = self.broadcastInput.get()
+        if s == "":
+            return
+        for i in s:
+            if ord(i) > 127:
+                messagebox.showerror("Error", "input ASCII only")
+                return
+        if len(s.encode()) > 126:
+            messagebox.showerror(
+                "Error",
+                "Too long",
+                detail=f"{len(s.encode())} > 126",
+            )
+            return
+        self.net.dataQ.put(
+            {
+                "dest": "kiss",
+                "payload": kiss.kiss_encode(s.encode(), kiss.CMD_DATA),
+            }
+        )
+        dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.broadcast.configure(state="normal")
+        self.broadcast.insert(tk.END, f"{dt} send: {s}\n")
+        self.broadcast.configure(state="disabled")
+        self.broadcast.see(tk.END)
+        with open(
+            os.path.join(self.chatPath.get(), "broadcast.csv"), "a", encoding="utf-8"
+        ) as f:
+            w = csv.writer(f)
+            w.writerow([dt, "send", self.broadcastInput.get()])
+        self.broadcastInput.set("")
 
     def run(self):
         self.handle_data()
@@ -663,8 +713,16 @@ class MercuryTk:
                                     "a",
                                     encoding="utf-8",
                                 ) as f:
-                                    f.write(
-                                        f"{self.recvTime},recv,chat,{self.dataTmp.decode(errors="backslashreplace")}\n"
+                                    w = csv.writer(f)
+                                    w.writerow(
+                                        [
+                                            self.recvTime,
+                                            "recv",
+                                            "chat",
+                                            self.dataTmp.decode(
+                                                errors="backslashreplace"
+                                            ),
+                                        ]
                                     )
                                 self.chatText.configure(state="disabled")
                                 self.chatText.see(tk.END)
@@ -715,8 +773,16 @@ class MercuryTk:
                                 "a",
                                 encoding="utf-8",
                             ) as f:
-                                f.write(
-                                    f"{self.recvTime},recv,file,{self.fileNameTmp.decode(errors="backslashreplace")}\n"
+                                w = csv.writer(f)
+                                w.writerow(
+                                    [
+                                        self.recvTime,
+                                        "recv",
+                                        "file",
+                                        self.fileNameTmp.decode(
+                                            errors="backslashreplace"
+                                        ),
+                                    ]
                                 )
                             self.chatText.configure(state="disabled")
                             self.chatText.see(tk.END)
@@ -741,7 +807,23 @@ class MercuryTk:
                             f"Recv file: {self.fileNameTmp.decode(errors="backslashreplace")} ({len(self.dataTmp)} / {self.contentLenTmp})"
                         )
             elif data["type"] == "kiss":
-                pass
+                l = kiss.kiss_decode(data["payload"])
+                dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                self.broadcast.configure(state="normal")
+                for pld in l:
+                    self.broadcast.insert(
+                        tk.END, f"{dt} recv: {pld.decode(errors="backslashreplace")}\n"
+                    )
+                self.broadcast.configure(state="disabled")
+                self.broadcast.see(tk.END)
+                with open(
+                    os.path.join(self.chatPath.get(), "broadcast.csv"),
+                    "a",
+                    encoding="utf-8",
+                ) as f:
+                    for pld in l:
+                        w = csv.writer(f)
+                        w.writerow([dt, "recv", pld.decode(errors="backslashreplace")])
         self.window.after(50, self.handle_data)
 
     def handle_ws_data(self, payload):

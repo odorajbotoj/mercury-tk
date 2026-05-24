@@ -110,7 +110,7 @@ class MtkNet:
             if not self.cmdConn:
                 return
             try:
-                buf += self.cmdConn.recv(2048).decode()
+                buf += self.cmdConn.recv(1024).decode()
                 l = buf.split("\r", 1)
                 while len(l) == 2:
                     self.uiQ.put({"type": "cmd", "payload": l[0]})
@@ -137,7 +137,7 @@ class MtkNet:
             if not self.kissConn:
                 return
             try:
-                self.uiQ.put({"type": "kiss", "payload": self.kissConn.recv(2048)})
+                self.uiQ.put({"type": "kiss", "payload": self.kissConn.recv(1024)})
             except:
                 return
 
@@ -155,3 +155,6 @@ class MtkNet:
             elif data["dest"] == "data":
                 if self.dataConn:
                     self.dataConn.sendall(data["payload"])
+            elif data["dest"] == "kiss":
+                if self.kissConn:
+                    self.kissConn.sendall(data["payload"])
