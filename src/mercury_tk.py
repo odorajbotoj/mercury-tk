@@ -15,7 +15,8 @@ import waterfall
 
 
 class MercuryTk:  # 主 ui 绘制
-    def __init__(self):
+    def __init__(self, v):
+        self.VERSION = v
         self.net = mtk_net.MtkNet()
         self.audioCaptureDevices = {}  # 存放音频输入设备的 name - id 对应
         self.audioPlaybackDevices = {}  # 存放音频输出设备的 name - id 对应
@@ -328,7 +329,10 @@ class MercuryTk:  # 主 ui 绘制
         cmdlogPage.grid_rowconfigure(0, weight=1)
         cmdlogPage.grid_columnconfigure(0, weight=1)
         chatNotebook.add(cmdlogPage, text="Command logs")
-        self.cmdLog = tk.Text(cmdlogPage, state="disabled")
+        self.cmdLog = tk.Text(cmdlogPage)
+        self.cmdLog.insert(tk.END, f"mercury-tk by BG4QBF\nVersion: {self.VERSION}\n\n")
+        self.cmdLog.see(tk.END)
+        self.cmdLog.configure(state="disabled")
         self.cmdLog.grid(row=0, column=0, sticky="nsew")
         sbCmd = ttk.Scrollbar(cmdlogPage)
         sbCmd.grid(row=0, column=1, sticky="ns")

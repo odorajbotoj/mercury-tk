@@ -2,6 +2,8 @@
 
 from mercury_tk import MercuryTk
 
+VERSION = "v0.0.1"
+
 if __name__ == "__main__":
-    app = MercuryTk()
+    app = MercuryTk(VERSION)
     app.run()
