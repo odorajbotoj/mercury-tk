@@ -922,7 +922,14 @@ class MercuryTk:  # 主 ui 绘制
                         self.recvStat = 0
                         break
             elif self.recvStat == 5:
-                if b == ord("\r") and len(self.dataTmp) == self.contentLenTmp:
+                if len(self.dataTmp) == self.contentLenTmp:
+                    if b != ord("\r"):
+                        messagebox.showerror("Error", "Bad file data")
+                        self.dataTmp = b""
+                        self.fileNameTmp = b""
+                        self.contentLenTmp = 0
+                        self.recvStat = 0
+                        break
                     # 显示
                     self.chatText.configure(state="normal")
                     self.chatText.insert(
