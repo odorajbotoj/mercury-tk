@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build.yml'
+      - 'src/**'
+      - '**.py'
+      - 'requirements.txt'
+  push:
+    paths:
+      - '.github/workflows/build.yml'
+      - 'src/**'
+      - '**.py'
+      - 'requirements.txt'
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+      - name: Build
+        run: pyinstaller -F -w -n mercury-tk src/app.py
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-pack-windows
+          path: dist/mercury-tk.exe
