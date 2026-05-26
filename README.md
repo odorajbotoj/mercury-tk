@@ -2,7 +2,7 @@
 
 A **rough** (and maybe **unsafe**) ui client for [Mercury HF Modem](https://github.com/Rhizomatica/mercury)
 
-written in `Python3` with `tkinter` , `pillow` , `numpy` , `websocket-client`, `pyserial`.
+written in **Python3.13** with `tkinter` , `pillow` , `numpy` , `websocket-client`, `pyserial`.
 
 by BG4QBF
 
