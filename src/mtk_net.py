@@ -27,7 +27,7 @@ class MtkNet:
         )
         try:
             self.cmdConn.connect((tcpUrl.hostname, tcpUrl.port))
-        except:
+        except Exception:
             self.disconnect()
             return
         self.dataConn = socket.socket(
@@ -35,7 +35,7 @@ class MtkNet:
         )
         try:
             self.dataConn.connect((tcpUrl.hostname, tcpUrl.port + 1))
-        except:
+        except Exception:
             self.disconnect()
             return
         # kiss
@@ -45,7 +45,7 @@ class MtkNet:
         )
         try:
             self.kissConn.connect((kissUrl.hostname, kissUrl.port))
-        except:
+        except Exception:
             self.disconnect()
             return
         # ws
@@ -66,32 +66,32 @@ class MtkNet:
             return
         else:
             self.closed = True
-        if type(self.cmdConn) == socket.socket:
+        if type(self.cmdConn) is socket.socket:
             try:
                 self.cmdConn.close()
-            except:
+            except Exception:
                 pass
-        if type(self.dataConn) == socket.socket:
+        if type(self.dataConn) is socket.socket:
             try:
                 self.dataConn.close()
-            except:
+            except Exception:
                 pass
-        if type(self.kissConn) == socket.socket:
+        if type(self.kissConn) is socket.socket:
             try:
                 self.kissConn.close()
-            except:
+            except Exception:
                 pass
-        if type(self.wsConn) == websocket.WebSocketApp:
+        if type(self.wsConn) is websocket.WebSocketApp:
             try:
                 self.wsConn.close()
-            except:
+            except Exception:
                 pass
         self.uiQ.put({"type": "modem", "connected": False})
 
     def ws_on_message(self, _, msg):
-        if type(msg) == str:
+        if type(msg) is str:
             self.uiQ.put({"type": "ws", "payload": json.loads(msg)})
-        elif type(msg) == bytes:
+        elif type(msg) is bytes:
             self.uiQ.put({"type": "waterfall", "payload": msg})
 
     def ws_on_close(self, ws, stat, msg):
@@ -99,7 +99,7 @@ class MtkNet:
         self.disconnect()
 
     def ws_run(self):
-        if type(self.wsConn) == websocket.WebSocketApp:
+        if type(self.wsConn) is websocket.WebSocketApp:
             self.wsConn.run_forever()
 
     def cmd_recv(self):
@@ -116,7 +116,7 @@ class MtkNet:
                     self.uiQ.put({"type": "cmd", "payload": l[0]})
                     buf = l[1]
                     l = l[1].split("\r", 1)
-            except:
+            except Exception:
                 return
 
     def data_recv(self):
@@ -127,7 +127,7 @@ class MtkNet:
                 return
             try:
                 self.uiQ.put({"type": "data", "payload": self.dataConn.recv(2048)})
-            except:
+            except Exception:
                 return
 
     def kiss_recv(self):
@@ -138,7 +138,7 @@ class MtkNet:
                 return
             try:
                 self.uiQ.put({"type": "kiss", "payload": self.kissConn.recv(1024)})
-            except:
+            except Exception:
                 return
 
     def handle_data(self):
