@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: pyinstaller -F -w -n mercury-tk src/app.py
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: auto-pack-windows
           path: dist/mercury-tk.exe
@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: auto-pack-windows
           path: dist/
