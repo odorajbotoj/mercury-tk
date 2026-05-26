@@ -27,6 +27,20 @@ by BG4QBF
 7. CQ, send broadcast, connect to other radio and make QSO
 8. if necessary, log to ADIF file
 
+## Data structure
+
+Chat message:
+
+```text
+\n[length // 256][length % 256]\r[message]\n
+```
+
+File:
+
+```text
+\r[file name]\r[length // 256][length % 256]\r[file content]\r
+```
+
 ## Coding Assistant
 
 + Xiaomi mimo v2.5 (opencode) for reading source code of Mercury
