@@ -43,7 +43,7 @@ jobs:
           name: auto-pack-windows
           path: dist/
       - name: Upload
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/mercury-tk.exe
