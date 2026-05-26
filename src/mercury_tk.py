@@ -266,9 +266,9 @@ class MercuryTk:  # 主 ui 绘制
         self.cqText.configure(yscrollcommand=sbCq.set)
         sbCq.configure(command=self.cqText.yview)
         self.connectDest = tk.StringVar(cqPage)
-        ttk.Entry(cqPage, textvariable=self.connectDest).grid(
-            row=1, column=0, sticky="ew"
-        )
+        dest = ttk.Entry(cqPage, textvariable=self.connectDest)
+        dest.grid(row=1, column=0, sticky="ew")
+        dest.bind("<Return>", lambda _: self.cb_connect_dest())
         ttk.Button(cqPage, text="Send CQ", command=self.cb_cq).grid(row=1, column=1)
         ttk.Button(cqPage, text="Connect...", command=self.cb_connect_dest).grid(
             row=1, column=2
@@ -294,9 +294,9 @@ class MercuryTk:  # 主 ui 绘制
             row=1, column=0, columnspan=3, sticky="ew"
         )
         self.chatTextInput = tk.StringVar(chatPage)
-        ttk.Entry(chatPage, textvariable=self.chatTextInput).grid(
-            row=2, column=0, sticky="ew"
-        )
+        inp = ttk.Entry(chatPage, textvariable=self.chatTextInput)
+        inp.grid(row=2, column=0, sticky="ew")
+        inp.bind("<Return>", lambda _: self.cb_send())
         ttk.Button(chatPage, text="Send", command=self.cb_send).grid(
             row=2, column=1, sticky="nsew"
         )
@@ -316,9 +316,9 @@ class MercuryTk:  # 主 ui 绘制
         self.broadcast.configure(yscrollcommand=sbBcast.set)
         sbBcast.configure(command=self.broadcast.yview)
         self.broadcastInput = tk.StringVar(broadcastPage)
-        ttk.Entry(broadcastPage, textvariable=self.broadcastInput).grid(
-            row=1, column=0, sticky="ew"
-        )
+        bcast = ttk.Entry(broadcastPage, textvariable=self.broadcastInput)
+        bcast.grid(row=1, column=0, sticky="ew")
+        bcast.bind("<Return>", lambda _: self.cb_broadcast())
         ttk.Button(broadcastPage, text="Broadcast", command=self.cb_broadcast).grid(
             row=1, column=1, sticky="nsew"
         )
@@ -550,6 +550,8 @@ class MercuryTk:  # 主 ui 绘制
         # 检查
         if self.net.closed:
             return
+        if self.sessionTime == "":
+            return
         l = len(self.chatTextInput.get().encode())
         if l == 0:
             return
@@ -585,6 +587,8 @@ class MercuryTk:  # 主 ui 绘制
 
     def cb_send_file(self):
         if self.net.closed:
+            return
+        if self.sessionTime == "":
             return
         f = filedialog.askopenfile("rb", title="File to send")
         if not f:
