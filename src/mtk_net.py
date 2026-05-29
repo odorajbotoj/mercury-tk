@@ -29,6 +29,13 @@ class MtkNet:
             self.cmdConn.connect((tcpUrl.hostname, tcpUrl.port))
         except Exception:
             self.disconnect()
+            self.uiQ.put(
+                {
+                    "type": "modem",
+                    "connected": False,
+                    "detail": "failed to open control port",
+                }
+            )
             return
         self.dataConn = socket.socket(
             socket.getaddrinfo(tcpUrl.hostname, tcpUrl.port)[0][0], socket.SOCK_STREAM
@@ -37,6 +44,13 @@ class MtkNet:
             self.dataConn.connect((tcpUrl.hostname, tcpUrl.port + 1))
         except Exception:
             self.disconnect()
+            self.uiQ.put(
+                {
+                    "type": "modem",
+                    "connected": False,
+                    "detail": "failed to open data port",
+                }
+            )
             return
         # kiss
         kissUrl = urllib.parse.urlparse("tcp://" + kissport)
@@ -47,6 +61,13 @@ class MtkNet:
             self.kissConn.connect((kissUrl.hostname, kissUrl.port))
         except Exception:
             self.disconnect()
+            self.uiQ.put(
+                {
+                    "type": "modem",
+                    "connected": False,
+                    "detail": "failed to open KISS port",
+                }
+            )
             return
         # ws
         self.wsConn = websocket.WebSocketApp(
@@ -59,7 +80,7 @@ class MtkNet:
         threading.Thread(target=self.cmd_recv, daemon=True).start()
         threading.Thread(target=self.data_recv, daemon=True).start()
         threading.Thread(target=self.kiss_recv, daemon=True).start()
-        self.uiQ.put({"type": "modem", "connected": True})
+        self.uiQ.put({"type": "modem", "connected": True, "detail": ""})
 
     def disconnect(self):
         if self.closed:
@@ -86,7 +107,7 @@ class MtkNet:
                 self.wsConn.close()
             except Exception:
                 pass
-        self.uiQ.put({"type": "modem", "connected": False})
+        self.uiQ.put({"type": "modem", "connected": False, "detail": ""})
 
     def ws_on_message(self, _, msg):
         if type(msg) is str:
