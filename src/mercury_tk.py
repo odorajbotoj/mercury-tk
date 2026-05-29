@@ -147,6 +147,24 @@ class MercuryTk:  # 主 ui 绘制
         ttk.Button(audioSettings, text="Apply", command=self.cb_apply_audio).grid(
             row=0, column=2, rowspan=3, sticky="ns"
         )
+        # separator
+        ttk.Separator(audioSettings).grid(
+            row=3, column=0, columnspan=3, sticky="ew", pady=(10, 10)
+        )
+        # Tx Gain
+        ttk.Label(audioSettings, text="TX Gain").grid(row=4, column=0)
+        self.txGain = tk.Scale(
+            audioSettings,
+            from_=-20,
+            to=20,
+            resolution=0.1,
+            orient="horizontal",
+            command=self.update_tx_gain,
+        )
+        self.txGain.grid(row=4, column=1, sticky="ew")
+        self.txGainReady = datetime.datetime.now()
+        self.peakDBFS = ttk.Label(audioSettings, text="Peak dBFS 0.0")
+        self.peakDBFS.grid(row=6, column=1)
 
         # mycall settings
         mycallSettings = ttk.Frame(settingsNotebook)
@@ -385,6 +403,19 @@ class MercuryTk:  # 主 ui 绘制
             l.append(i.device)
         self.dvcCom["value"] = l
         self.dvcCom.current(0)
+
+    # 以下为更新发射增益的回调
+
+    def update_tx_gain(self, value):
+        if self.net.closed:
+            return
+        self.net.dataQ.put(
+            {
+                "dest": "ws",
+                "payload": {"command": "set_tx_gain", "value": value},
+            }
+        )
+        self.txGainReady = datetime.datetime.now()
 
     # 以下为浏览路径的回调
 
@@ -777,6 +808,11 @@ class MercuryTk:  # 主 ui 绘制
                         self.direction.configure(text=f"DIR: TX", foreground="red")
                     self.bytesTx.configure(text=f"TX {payload["bytes_transmitted"]}")
                     self.bytesRx.configure(text=f"RX {payload["bytes_received"]}")
+                    if datetime.datetime.now() - self.txGainReady > datetime.timedelta(
+                        seconds=3
+                    ):
+                        self.txGain.set(payload["tx_gain_db"])
+                    self.peakDBFS.configure(text=f"Peak dBFS {payload["tx_peak_dbfs"]}")
                 elif payload["type"] == "capture_dev_list":  # 更新音频输入设备列表
                     l = []
                     self.audioCaptureDevices = {}
@@ -832,7 +868,8 @@ class MercuryTk:  # 主 ui 绘制
             # 处理命令返回
             if "status" in payload.keys():
                 if payload["status"] == "ok":
-                    messagebox.showinfo("OK", "websocket returned OK")
+                    # messagebox.showinfo("OK", "websocket returned OK")
+                    pass
                 elif payload["status"] == "error":
                     messagebox.showerror(
                         "Error",
