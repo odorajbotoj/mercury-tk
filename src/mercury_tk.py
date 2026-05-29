@@ -112,7 +112,6 @@ class MercuryTk:  # 主 ui 绘制
         self.radioDevice = tk.StringVar(hamlibSettings)
         self.dvcCom = ttk.Combobox(hamlibSettings, textvariable=self.radioDevice)
         self.dvcCom.bind("<Button-1>", self.update_serial_port)
-        self.dvcCom.bind("<FocusIn>", self.update_serial_port)
         self.dvcCom.grid(row=1, column=1, sticky="ew")
         # baudrate
         ttk.Label(hamlibSettings, text="Baudrate").grid(row=2, column=0)
@@ -330,7 +329,10 @@ class MercuryTk:  # 主 ui 绘制
         cmdlogPage.grid_columnconfigure(0, weight=1)
         chatNotebook.add(cmdlogPage, text="Command logs")
         self.cmdLog = tk.Text(cmdlogPage)
-        self.cmdLog.insert(tk.END, f"mercury-tk by BG4QBF\nVersion: {self.VERSION}\n\n")
+        self.cmdLog.insert(
+            tk.END,
+            f"mercury-tk by BG4QBF\nVersion: {self.VERSION}\nneed Mercury v1.9.9+\n\n",
+        )
         self.cmdLog.see(tk.END)
         self.cmdLog.configure(state="disabled")
         self.cmdLog.grid(row=0, column=0, sticky="nsew")
@@ -681,7 +683,11 @@ class MercuryTk:  # 主 ui 绘制
                 else:
                     self.connBtnText.set("Connect")
                     self.connStat.configure(text="MODEM DISCONNECTED", foreground="red")
-                    messagebox.showerror(title="Error", message="Modem disconnected")
+                    messagebox.showerror(
+                        title="Error",
+                        message="Modem disconnected",
+                        detail=data["detail"],
+                    )
             elif data["type"] == "ws":  # 交给ws处理器
                 self.handle_ws_data(data["payload"])
             elif data["type"] == "waterfall":  # 交给瀑布图处理器
@@ -730,109 +736,116 @@ class MercuryTk:  # 主 ui 绘制
 
     # ws处理器
     def handle_ws_data(self, payload):
-        if "type" in payload.keys():
-            if payload["type"] == "status":  # 更新modem状态
-                self.bitrate.configure(text=f"BR {payload["bitrate"]}")
-                self.snr.configure(text=f"SNR {payload["snr"]}")
-                self.userCall.configure(text=f"UserCall {payload["user_callsign"]}")
-                if self.myCallsign.get() == "":
-                    self.myCallsign.set(payload["user_callsign"])
-                self.destCall.configure(text=f"DestCall {payload["dest_callsign"]}")
-                if payload["sync"]:  # 连接, 更新session数据
-                    self.sync.config(text="SYNC", foreground="green")
-                    if self.sessionTime == "":
-                        self.sessionTime = datetime.datetime.now().strftime(
-                            "%Y-%m-%d_%H-%M-%S"
+        try:
+            if "type" in payload.keys():
+                if payload["type"] == "status":  # 更新modem状态
+                    self.bitrate.configure(text=f"BR {payload["bitrate"]}")
+                    self.snr.configure(text=f"SNR {payload["snr"]}")
+                    self.userCall.configure(text=f"UserCall {payload["user_callsign"]}")
+                    if self.myCallsign.get() == "":
+                        self.myCallsign.set(payload["user_callsign"])
+                    self.destCall.configure(text=f"DestCall {payload["dest_callsign"]}")
+                    if payload["sync"]:  # 连接, 更新session数据
+                        self.sync.config(text="SYNC", foreground="green")
+                        if self.sessionTime == "":
+                            self.sessionTime = datetime.datetime.now().strftime(
+                                "%Y-%m-%d_%H-%M-%S"
+                            )
+                            self.sessionPath = os.path.join(
+                                self.chatPath.get(),
+                                f"{payload["dest_callsign"]}_{self.sessionTime}",
+                            )
+                            self.chatText.configure(state="normal")
+                            self.chatText.delete("1.0", tk.END)
+                            self.chatText.configure(state="disabled")
+                            if not os.path.exists(self.sessionPath):
+                                os.makedirs(self.sessionPath)
+                    else:  # 断连, 清理
+                        self.sync.config(text="NO SYNC", foreground="red")
+                        self.recvStat = 0
+                        self.recvTime = datetime.datetime.now()
+                        self.fileNameTmp = b""
+                        self.lenSaved = 0
+                        self.contentLenTmp = 0
+                        self.dataTmp = b""
+                        self.recvTmp.set("")
+                        self.sessionTime = ""
+                        self.sessionPath = ""
+                    if payload["direction"] == "rx":
+                        self.direction.configure(text=f"DIR: RX", foreground="green")
+                    else:
+                        self.direction.configure(text=f"DIR: TX", foreground="red")
+                    self.bytesTx.configure(text=f"TX {payload["bytes_transmitted"]}")
+                    self.bytesRx.configure(text=f"RX {payload["bytes_received"]}")
+                elif payload["type"] == "capture_dev_list":  # 更新音频输入设备列表
+                    l = []
+                    self.audioCaptureDevices = {}
+                    cur = 0
+                    for i in range(len(payload["list"])):
+                        if payload["list"][i]["id"] == payload["selected"]:
+                            cur = i
+                        l.append(
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
                         )
-                        self.sessionPath = os.path.join(
-                            self.chatPath.get(),
-                            f"{payload["dest_callsign"]}_{self.sessionTime}",
+                        self.audioCaptureDevices[
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+                        ] = payload["list"][i]["id"]
+                    self.cptCom["values"] = l
+                    self.cptCom.current(cur)
+                elif payload["type"] == "playback_dev_list":  # 更新音频输出设备列表
+                    l = []
+                    self.audioPlaybackDevices = {}
+                    cur = 0
+                    for i in range(len(payload["list"])):
+                        if payload["list"][i]["id"] == payload["selected"]:
+                            cur = i
+                        l.append(
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
                         )
-                        self.chatText.configure(state="normal")
-                        self.chatText.delete("1.0", tk.END)
-                        self.chatText.configure(state="disabled")
-                        if not os.path.exists(self.sessionPath):
-                            os.makedirs(self.sessionPath)
-                else:  # 断连, 清理
-                    self.sync.config(text="NO SYNC", foreground="red")
-                    self.recvStat = 0
-                    self.recvTime = datetime.datetime.now()
-                    self.fileNameTmp = b""
-                    self.lenSaved = 0
-                    self.contentLenTmp = 0
-                    self.dataTmp = b""
-                    self.recvTmp.set("")
-                    self.sessionTime = ""
-                    self.sessionPath = ""
-                if payload["direction"] == "rx":
-                    self.direction.configure(text=f"DIR: RX", foreground="green")
-                else:
-                    self.direction.configure(text=f"DIR: TX", foreground="red")
-                self.bytesTx.configure(text=f"TX {payload["bytes_transmitted"]}")
-                self.bytesRx.configure(text=f"RX {payload["bytes_received"]}")
-            elif payload["type"] == "capture_dev_list":  # 更新音频输入设备列表
-                l = []
-                self.audioCaptureDevices = {}
-                cur = 0
-                for i in range(len(payload["list"])):
-                    if payload["list"][i]["id"] == payload["selected"]:
-                        cur = i
-                    l.append(
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+                        self.audioPlaybackDevices[
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+                        ] = payload["list"][i]["id"]
+                    self.plbkCom["values"] = l
+                    self.plbkCom.current(cur)
+                elif payload["type"] == "input_channel":  # 更新声道选项
+                    self.chnCom["values"] = payload["list"]
+                    self.chnCom.current(payload["list"].index(payload["selected"]))
+                elif payload["type"] == "radio_list":  # 更新电台设备列表
+                    l = []
+                    self.radioModels = {}
+                    cur = 0
+                    for i in range(len(payload["list"])):
+                        if payload["list"][i]["id"] == payload["selected"]:
+                            cur = i
+                        l.append(
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+                        )
+                        self.radioModels[
+                            f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+                        ] = payload["list"][i]["id"]
+                    self.mdlCom["values"] = l
+                    self.mdlCom.current(cur)
+                    self.radioDevice.set(payload["device_path"])
+                    self.bdrtCom.current(
+                        self.bdrtCom["values"].index(str(payload["serial_speed"]))
                     )
-                    self.audioCaptureDevices[
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
-                    ] = payload["list"][i]["id"]
-                self.cptCom["values"] = l
-                self.cptCom.current(cur)
-            elif payload["type"] == "playback_dev_list":  # 更新音频输出设备列表
-                l = []
-                self.audioPlaybackDevices = {}
-                cur = 0
-                for i in range(len(payload["list"])):
-                    if payload["list"][i]["id"] == payload["selected"]:
-                        cur = i
-                    l.append(
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
+            # 处理命令返回
+            if "status" in payload.keys():
+                if payload["status"] == "ok":
+                    messagebox.showinfo("OK", "websocket returned OK")
+                elif payload["status"] == "error":
+                    messagebox.showerror(
+                        "Error",
+                        "got an error from websocket",
+                        detail=str(payload["code"]),
                     )
-                    self.audioPlaybackDevices[
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
-                    ] = payload["list"][i]["id"]
-                self.plbkCom["values"] = l
-                self.plbkCom.current(cur)
-            elif payload["type"] == "input_channel":  # 更新声道选项
-                self.chnCom["values"] = payload["list"]
-                self.chnCom.current(payload["list"].index(payload["selected"]))
-            elif payload["type"] == "radio_list":  # 更新电台设备列表
-                l = []
-                self.radioModels = {}
-                cur = 0
-                for i in range(len(payload["list"])):
-                    if payload["list"][i]["id"] == payload["selected"]:
-                        cur = i
-                    l.append(
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
-                    )
-                    self.radioModels[
-                        f"{payload["list"][i]["name"]} ({payload["list"][i]["id"]})"
-                    ] = payload["list"][i]["id"]
-                self.mdlCom["values"] = l
-                self.mdlCom.current(cur)
-                self.radioDevice.set(payload["device_path"])
-                self.bdrtCom.current(
-                    self.bdrtCom["values"].index(str(payload["serial_speed"]))
-                )
-        # 处理命令返回
-        if "status" in payload.keys():
-            if payload["status"] == "ok":
-                messagebox.showinfo("OK", "websocket returned OK")
-            elif payload["status"] == "error":
+            if "error" in payload.keys():
                 messagebox.showerror(
-                    "Error", "got an error from websocket", detail=str(payload["code"])
+                    "Error", "Error from websocket", detail=payload["error"]
                 )
-        if "error" in payload.keys():
+        except Exception as e:
             messagebox.showerror(
-                "Error", "Error from websocket", detail=payload["error"]
+                "Error", "failed to parse data from mercury", detail=str(e)
             )
 
     # 解析接收数据
