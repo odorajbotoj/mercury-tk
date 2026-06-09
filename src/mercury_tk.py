@@ -439,12 +439,12 @@ class MercuryTk:  # 主 ui 绘制
 
     def update_log_date(self, _):
         self.logDate.set(
-            datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+            datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d")
         )
 
     def update_log_time(self, _):
         self.logTime.set(
-            datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%SZ")
+            datetime.datetime.now(datetime.timezone.utc).strftime("%H%M%S")
         )
 
     # 以下为按钮回调
