@@ -117,3 +117,18 @@ class Waterfall:
                 for row in range(scroll):
                     pixels[x, row] = (r, g, b)
         self.refresh_photo()
+
+
+class MTkWaterfall:
+    def __init__(self, win):
+        self.draw_win(win)
+
+    def draw_win(self, win):
+        self.wfCanvas = tk.Canvas(win, bg="black", height=200)
+        self.wfCanvas.grid(row=6, column=0, sticky="ew")
+        self.wf = Waterfall(self.wfCanvas)
+
+    def draw(self, data):
+        re = parse_spectrum(data)
+        if re:
+            self.wf.push(*re)

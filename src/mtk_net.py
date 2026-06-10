@@ -6,15 +6,15 @@ import urllib.parse
 import json
 
 
-class MtkNet:
-    def __init__(self):
+class MTkNet:
+    def __init__(self, q):
         self.cmdConn = None
         self.dataConn = None
         self.kissConn = None
         self.wsConn = None
         self.closed = True
-        self.uiQ = queue.Queue()
         self.dataQ = queue.Queue()
+        self.uiQ = q
 
     def connect(self, tcpport, kissport, wsport):
         if not self.closed:
@@ -134,7 +134,7 @@ class MtkNet:
                 buf += self.cmdConn.recv(1024).decode()
                 l = buf.split("\r", 1)
                 while len(l) == 2:
-                    self.uiQ.put({"type": "cmd", "payload": l[0]})
+                    self.uiQ.put({"type": "cmd", "payload": l[0], "direction": "recv"})
                     buf = l[1]
                     l = l[1].split("\r", 1)
             except Exception:
