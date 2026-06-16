@@ -143,6 +143,8 @@ class MTkChat:
     def cb_connect_dest(self):
         if self.net.closed:
             return
+        if self.sessionTime != "":
+            return
         if self.callsign == "":
             messagebox.showerror("Error", "No callsign")
             return
@@ -163,6 +165,8 @@ class MTkChat:
 
     def cb_disconnect(self):
         if self.net.closed:
+            return
+        if self.sessionTime == "":
             return
         self.net.dataQ.put({"dest": "cmd", "payload": "DISCONNECT\r"})
         # 追加到命令历史
