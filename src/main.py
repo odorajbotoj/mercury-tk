@@ -2,7 +2,7 @@
 
 from mercury_tk import MercuryTk
 
-VERSION = "v0.1.0"
+VERSION = "v0.1.1"
 
 if __name__ == "__main__":
     app = MercuryTk(VERSION)
