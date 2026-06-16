@@ -339,3 +339,15 @@ class MTkChat:
 
     def set_mycallsign(self, cs):
         self.callsign = cs
+
+    def get_session_time(self):
+        return self.sessionTime
+
+    def set_session_time(self, v):
+        self.sessionTime = v
+
+    def get_session_path(self):
+        return self.sessionPath
+
+    def set_session_path(self, v):
+        self.sessionPath = v

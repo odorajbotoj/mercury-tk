@@ -148,17 +148,19 @@ class MercuryTk:  # 主 ui 绘制
                         self.frame_chat.set_mycallsign(self.callsign)
                     if payload["sync"]:  # 连接, 更新session数据
                         self.frame_status.update_sync_stat("SYNC", "green")
-                        if self.sessionTime == "":
-                            self.sessionTime = datetime.datetime.now().strftime(
-                                "%Y-%m-%d_%H-%M-%S"
+                        if self.frame_chat.get_session_time() == "":
+                            self.frame_chat.set_session_time(
+                                datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                             )
-                            self.sessionPath = os.path.join(
-                                self.frame_settings.chat_path(),
-                                f"{payload["dest_callsign"]}_{self.sessionTime}",
+                            self.frame_chat.set_session_path(
+                                os.path.join(
+                                    self.frame_settings.chat_path(),
+                                    f"{payload["dest_callsign"]}_{self.frame_chat.get_session_time()}",
+                                )
                             )
                             self.frame_chat.clear_chat_text()
-                            if not os.path.exists(self.sessionPath):
-                                os.makedirs(self.sessionPath)
+                            if not os.path.exists(self.frame_chat.get_session_path()):
+                                os.makedirs(self.frame_chat.get_session_path())
                     else:  # 断连, 清理
                         self.frame_status.update_sync_stat("NO SYNC", "red")
                         self.recvStat = 0
@@ -168,8 +170,8 @@ class MercuryTk:  # 主 ui 绘制
                         self.contentLenTmp = 0
                         self.dataTmp = b""
                         self.frame_chat.update_recv_tmp("")
-                        self.sessionTime = ""
-                        self.sessionPath = ""
+                        self.frame_chat.set_session_time("")
+                        self.frame_chat.set_session_path("")
                     if payload["direction"] == "rx":
                         self.frame_status.update_direction_stat("DIR: RX", "green")
                     else:
@@ -252,7 +254,9 @@ class MercuryTk:  # 主 ui 绘制
                         )
                         # 落盘
                         with open(
-                            os.path.join(self.sessionPath, "chat.csv"),
+                            os.path.join(
+                                self.frame_chat.get_session_path(), "chat.csv"
+                            ),
                             "a",
                             encoding="utf-8",
                         ) as f:
@@ -319,7 +323,7 @@ class MercuryTk:  # 主 ui 绘制
                     )
                     # 落盘
                     with open(
-                        os.path.join(self.sessionPath, "chat.csv"),
+                        os.path.join(self.frame_chat.get_session_path(), "chat.csv"),
                         "a",
                         encoding="utf-8",
                     ) as f:
@@ -333,7 +337,7 @@ class MercuryTk:  # 主 ui 绘制
                             ]
                         )
                     fp = os.path.join(
-                        self.sessionPath,
+                        self.frame_chat.get_session_path(),
                         self.recvTime.strftime("%Y-%m-%d_%H-%M-%S_")
                         + self.fileNameTmp.decode(errors="backslashreplace"),
                     )
